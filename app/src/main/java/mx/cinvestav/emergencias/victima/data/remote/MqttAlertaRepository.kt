@@ -83,6 +83,10 @@ class MqttAlertaRepository(
     private fun manejarAlerta(payload: String) {
         runCatching { gson.fromJson(payload, AlertaDto::class.java) }
             .onSuccess { dto ->
+                if (dto.tipo.equals("FIN_EMERGENCIA", ignoreCase = true)) {
+                    _estadoEmergencia.value = EstadoEmergencia(ModoSistema.NORMAL, null)
+                    return@onSuccess
+                }
                 val alerta = dto.toDominio(edificioId)
                 _estadoEmergencia.value = EstadoEmergencia(ModoSistema.EMERGENCIA, alerta)
                 _eventosAlerta.tryEmit(alerta)
