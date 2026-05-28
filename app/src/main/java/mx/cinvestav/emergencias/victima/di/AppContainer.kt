@@ -31,10 +31,12 @@ class AppContainer(context: Context) {
     val repository: AlertaRepository = if (USE_FAKE) {
         FakeAlertaRepository(appScope, EDIFICIO_ID)
     } else {
-        val clienteId = "victima-${UUID.randomUUID()}"
         MqttAlertaRepository(
-            cliente = MqttClienteFog(FOG_HOST, FOG_PUERTO, clienteId),
-            edificioId = EDIFICIO_ID
+            cliente     = MqttClienteFog(FOG_HOST, FOG_PUERTO, "victima-${UUID.randomUUID()}"),
+            edificioId  = EDIFICIO_ID,
+            victimaId   = VICTIMA_ID,   // debe coincidir con datos en el nodo FOG
+            scope       = appScope,
+            heartbeatMs = HEARTBEAT_INTERVALO_MS
         )
     }
     val simulador: SimuladorAlertas? = repository as? SimuladorAlertas
@@ -42,24 +44,31 @@ class AppContainer(context: Context) {
     // --- Fuente de datos médicos (CU-03) ---
     private val saludDataStore = SaludDataStore(appContext)
     val saludRepository: SaludRepository = FakeSaludRepository(saludDataStore)
-    // Cuando el nodo FOG esté listo: SaludRemoteRepository(apiService, saludDataStore)
 
     // --- Casos de uso CU-08 ---
-    val observarEmergencia = ObservarEmergenciaUseCase(repository)
+    val observarEmergencia    = ObservarEmergenciaUseCase(repository)
     val observarEventosAlerta = ObservarEventosAlertaUseCase(repository)
-    val observarConexion = ObservarConexionUseCase(repository)
-    val gestionarConexion = GestionarConexionUseCase(repository)
+    val observarConexion      = ObservarConexionUseCase(repository)
+    val gestionarConexion     = GestionarConexionUseCase(repository)
 
     // --- Casos de uso CU-03 ---
-    val observarDatosMedicos = ObservarDatosMedicosUseCase(saludRepository)
+    val observarDatosMedicos  = ObservarDatosMedicosUseCase(saludRepository)
     val registrarDatosMedicos = RegistrarDatosMedicosUseCase(saludRepository)
 
     fun limpiar() = appScope.cancel()
 
     companion object {
-        const val USE_FAKE = true
-        const val FOG_HOST = "broker.hivemq.com"
-        const val FOG_PUERTO = 1883
-        const val EDIFICIO_ID = "edificioA"
+        // ⬅️ false para conectar al nodo FOG real
+        const val USE_FAKE = false
+
+        const val FOG_HOST     = "192.168.10.229"  // IP del Debian (actualizar si cambia la red)
+        const val FOG_PUERTO   = 1883
+        const val EDIFICIO_ID  = "edificioA"
+
+        // ⬅️ Debe coincidir con el ID en DataInitializer del nodo FOG
+        const val VICTIMA_ID   = "victima-001"
+
+        // 30s para demo — en producción usar 300_000L (5 min)
+        const val HEARTBEAT_INTERVALO_MS = 30_000L
     }
 }
