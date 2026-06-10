@@ -18,4 +18,13 @@ class App : Application() {
         super.onCreate()
         container = AppContainer(this)
     }
+
+    /**
+     * Recrea el AppContainer leyendo la IP y usuario actuales de FogPreferences.
+     * Llamar después del login para que el AlertaViewModel conecte con la IP correcta.
+     */
+    fun reiniciarContainer() {
+        container.limpiar()
+        container = AppContainer(this)
+    }
 }

@@ -4,11 +4,14 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import mx.cinvestav.emergencias.victima.data.fake.FakeAlertaRepository
 import mx.cinvestav.emergencias.victima.data.fake.FakeSaludRepository
 import mx.cinvestav.emergencias.victima.data.local.SaludDataStore
 import mx.cinvestav.emergencias.victima.data.remote.MqttAlertaRepository
 import mx.cinvestav.emergencias.victima.data.remote.mqtt.MqttClienteFog
+import mx.cinvestav.emergencias.victima.data.FogPreferences
 import mx.cinvestav.emergencias.victima.domain.AlertaRepository
 import mx.cinvestav.emergencias.victima.domain.SimuladorAlertas
 import mx.cinvestav.emergencias.victima.domain.SaludRepository
@@ -27,14 +30,27 @@ class AppContainer(context: Context) {
     val appScope: CoroutineScope = CoroutineScope(SupervisorJob())
     val notificador = Notificador(appContext)
 
+    // ── Leer configuración dinámica de FogPreferences ─────────────────
+    // (IP configurada por el usuario en IpConfigScreen)
+    private val prefs = FogPreferences(appContext)
+
+    private val fogHost: String = runBlocking { prefs.fogHost.first() }
+        .takeIf { it.isNotEmpty() } ?: "localhost"
+
+    private val fogPuerto: Int = runBlocking { prefs.mqttPort.first() }
+
+    // Identificador del usuario logueado (reemplaza el hardcodeado del Sprint 1)
+    private val victimaId: String = runBlocking { prefs.userIdentificador.first() }
+        .takeIf { it.isNotEmpty() } ?: "victima-001"
+
     // --- Fuente de alertas (CU-08) ---
     val repository: AlertaRepository = if (USE_FAKE) {
         FakeAlertaRepository(appScope, EDIFICIO_ID)
     } else {
         MqttAlertaRepository(
-            cliente     = MqttClienteFog(FOG_HOST, FOG_PUERTO, "victima-${UUID.randomUUID()}"),
+            cliente     = MqttClienteFog(fogHost, fogPuerto, "victima-${UUID.randomUUID()}"),
             edificioId  = EDIFICIO_ID,
-            victimaId   = VICTIMA_ID,   // debe coincidir con datos en el nodo FOG
+            victimaId   = victimaId,
             scope       = appScope,
             heartbeatMs = HEARTBEAT_INTERVALO_MS
         )
@@ -61,14 +77,8 @@ class AppContainer(context: Context) {
         // ⬅️ false para conectar al nodo FOG real
         const val USE_FAKE = false
 
-        const val FOG_HOST     = "192.168.10.229"  // IP del Debian (actualizar si cambia la red)
-        const val FOG_PUERTO   = 1883
-        const val EDIFICIO_ID  = "edificioA"
-
-        // ⬅️ Debe coincidir con el ID en DataInitializer del nodo FOG
-        const val VICTIMA_ID   = "victima-001"
-
-        // 30s para demo — en producción usar 300_000L (5 min)
+        // La IP ya no va aquí — viene de FogPreferences (IpConfigScreen)
+        const val EDIFICIO_ID            = "edificioA"
         const val HEARTBEAT_INTERVALO_MS = 30_000L
     }
 }
