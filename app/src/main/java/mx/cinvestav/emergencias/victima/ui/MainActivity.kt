@@ -2,6 +2,7 @@ package mx.cinvestav.emergencias.victima.ui
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -54,6 +55,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val locationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { _ ->
+                    startForegroundService(
+                        Intent(this@MainActivity, FogForegroundService::class.java)
+                    )
+                }
+
                 val fogHost by fogPrefs.fogHost.collectAsState(initial = "")
                 val isLoggedIn by fogPrefs.isLoggedIn.collectAsState(initial = false)
 
@@ -63,9 +72,15 @@ class MainActivity : ComponentActivity() {
                     }
                     !isLoggedIn -> {
                         LoginScreen(onLoginExitoso = {
-                            startForegroundService(
-                                Intent(this@MainActivity, FogForegroundService::class.java)
-                            )
+                            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                startForegroundService(
+                                    Intent(this@MainActivity, FogForegroundService::class.java)
+                                )
+                            } else {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
                         })
                     }
                     else -> {
